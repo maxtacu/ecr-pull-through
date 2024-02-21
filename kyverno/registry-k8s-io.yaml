@@ -1,0 +1,106 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: use-pull-through-registry-k8s
+  annotations:
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/title: Use ECR Pull Through Cache
+    policies.kyverno.io/minversion: 1.6.0
+    policies.kyverno.io/description: >-
+      Use a ECR Pull Through Cache instead of upstream registry.k8s.io community registry.
+spec:
+  mutateExistingOnPolicyUpdate: false
+  rules:
+  - name: change-containers
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    preconditions:
+      all:
+      - key: "{{request.operation || 'BACKGROUND'}}"
+        operator: AnyIn
+        value:
+        - CREATE
+        - UPDATE
+      - key: registry.k8s.io
+        operator: AnyIn
+        value: "{{ images.containers.*.registry[] || `[]` }}"
+    mutate:
+      foreach:
+      - list: "request.object.spec.containers"
+        preconditions:
+          all:
+          - key: registry.k8s.io
+            operator: AnyIn
+            value: '{{ images.containers."{{element.name}}".registry}}'
+        patchStrategicMerge:
+          spec:
+            containers:
+            - name: "{{ element.name }}"
+              image: <account_id>.dkr.ecr.us-east-1.amazonaws.com/{{ element.image }}
+  - name: change-initcontainers
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    preconditions:
+      all:
+      - key: "{{request.operation || 'BACKGROUND'}}"
+        operator: AnyIn
+        value:
+        - CREATE
+        - UPDATE
+      - key: "{{ request.object.spec.initContainers[] || '' | length(@) }}"
+        operator: GreaterThanOrEquals
+        value: 1
+      - key: registry.k8s.io
+        operator: AnyIn
+        value: "{{ images.initContainers.*.registry[] || `[]` }}"
+    mutate:
+      foreach:
+      - list: "request.object.spec.initContainers"
+        preconditions:
+          all:
+          - key: registry.k8s.io
+            operator: AnyIn
+            value: '{{ images.initContainers."{{element.name}}".registry}}'
+        patchStrategicMerge:
+          spec:
+            initContainers:
+            - name: "{{ element.name }}"
+              image: <account_id>.dkr.ecr.us-east-1.amazonaws.com/{{ element.image }}
+  - name: change-ephemeralcontainers
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    preconditions:
+      all:
+      - key: "{{request.operation || 'BACKGROUND'}}"
+        operator: AnyIn
+        value:
+        - CREATE
+        - UPDATE
+      - key: "{{ request.object.spec.ephemeralContainers[] || '' | length(@) }}"
+        operator: GreaterThanOrEquals
+        value: 1
+      - key: registry.k8s.io
+        operator: AnyIn
+        value: "{{ images.ephemeralContainers.*.registry[] || `[]` }}"
+    mutate:
+      foreach:
+        - list: "request.object.spec.ephemeralContainers"
+          preconditions:
+            all:
+            - key: registry.k8s.io
+              operator: AnyIn
+              value: '{{ images.ephemeralContainers."{{element.name}}".registry}}'
+          patchStrategicMerge:
+            spec:
+              ephemeralContainers:
+              - name: "{{ element.name }}"
+                image: <account_id>.dkr.ecr.us-east-1.amazonaws.com/{{ element.image }}
