@@ -1,0 +1,23 @@
+{
+    "Version":  "2012-10-17",
+    "Statement": [
+    {
+        "Sid": "pull-through",
+        "Effect": "Allow",
+        "Principal": {
+        "AWS": [
+            "arn:aws:iam::<accound_id>:role/<eks-node-role>"
+            ]
+        },
+        "Action": [
+            "ecr:CreateRepository",
+            "ecr:BatchImportUpstreamImage"
+        ],
+        "Resource": [
+            "arn:aws:ecr:us-east-1:708937582560:repository/ghcr.io/*",
+            "arn:aws:ecr:us-east-1:708937582560:repository/docker.io/*",
+            "arn:aws:ecr:us-east-1:708937582560:repository/registry.k8s.io/*",
+            "arn:aws:ecr:us-east-1:708937582560:repository/quay.io/*"
+        ]
+    }]
+}
