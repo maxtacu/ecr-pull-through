@@ -1,0 +1,26 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: busybox-quay-io
+  namespace: delta
+spec:
+  restartPolicy: OnFailure
+  containers:
+  - name: busybox
+    image: quay.io/quay/busybox:latest
+    command: ['sh', '-c', 'echo "Success!" && sleep 60']
+    imagePullPolicy: Always
+
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: kiali-quay-io
+  namespace: delta
+spec:
+  restartPolicy: OnFailure
+  containers:
+  - name: busybox
+    image: quay.io/kiali/kiali:v1.78.0
+    command: ['sh', '-c', 'echo "Success!" && sleep 60']
+    imagePullPolicy: Always

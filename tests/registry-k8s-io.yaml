@@ -1,0 +1,12 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: busybox-registry-k8s-io
+  namespace: delta
+spec:
+  restartPolicy: OnFailure
+  containers:
+  - name: busybox
+    image: registry.k8s.io/busybox:latest
+    command: ['sh', '-c', 'echo "Success!" && sleep 60']
+    imagePullPolicy: Always

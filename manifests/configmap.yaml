@@ -1,0 +1,14 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: pull-through-webhook
+  namespace: kube-system
+data:
+  registries.yaml: |
+    awsRegion: us-east-1
+    awsAccountId: 123456789012
+    registries:
+      - quay.io
+      - docker.io
+      - ghcr.io
+      - registry.k8s.io

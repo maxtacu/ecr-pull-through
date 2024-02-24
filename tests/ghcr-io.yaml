@@ -1,0 +1,12 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: busybox-ghcr-io
+  namespace: delta
+spec:
+  restartPolicy: OnFailure
+  containers:
+  - name: busybox
+    image: ghcr.io/kedacore/keda:2.11.2
+    command: ['sh', '-c', 'echo "Success!" && sleep 60']
+    imagePullPolicy: Always
