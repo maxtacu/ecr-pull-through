@@ -1,0 +1,72 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: pull-through-webhook
+  namespace: kube-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pull-through-webhook
+  template:
+    metadata:
+      labels:
+        app: pull-through-webhook
+    spec:
+      containers:
+        - name: pull-through-webhook
+          image: ghcr.io/maxtacu/ecr-pull-through:master
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8443
+          volumeMounts:
+            - name: tls
+              mountPath: "/tls"
+              readOnly: true
+            - name: config
+              mountPath: "/conf"
+              readOnly: true
+      volumes:
+        - name: tls
+          secret:
+            secretName: pull-through-tls
+        - name: config
+          configMap:
+            name: pull-through-webhook
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: pull-through-webhook
+  namespace: kube-system
+spec:
+  selector:
+    app: pull-through-webhook
+  ports:
+    - port: 443
+      targetPort: 8443
+---
+kind: MutatingWebhookConfiguration
+apiVersion: admissionregistration.k8s.io/v1
+metadata:
+  name: pull-through-webhook
+  namespace: kube-system
+webhooks:
+  - name: pull-through.webhook.dev
+    clientConfig:
+      caBundle: REPLACEME
+      service:
+        namespace: kube-system
+        name: pull-through-webhook
+        path: /mutate
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+        operations: ["CREATE", "UPDATE"]
+        scope: Namespaced
+    namespaceSelector:
+      matchLabels:
+        pull-through-enabled: "true" 
+    sideEffects: None
+    admissionReviewVersions: ["v1"]

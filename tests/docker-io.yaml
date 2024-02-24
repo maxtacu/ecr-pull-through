@@ -1,0 +1,12 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: busybox-docker-io
+  namespace: delta
+spec:
+  restartPolicy: OnFailure
+  containers:
+  - name: busybox
+    image: busybox:latest
+    command: ['sh', '-c', 'echo "Success!" && sleep 60']
+    imagePullPolicy: Always

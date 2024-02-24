@@ -14,10 +14,10 @@
             "ecr:BatchImportUpstreamImage"
         ],
         "Resource": [
-            "arn:aws:ecr:us-east-1:708937582560:repository/ghcr.io/*",
-            "arn:aws:ecr:us-east-1:708937582560:repository/docker.io/*",
-            "arn:aws:ecr:us-east-1:708937582560:repository/registry.k8s.io/*",
-            "arn:aws:ecr:us-east-1:708937582560:repository/quay.io/*"
+            "arn:aws:ecr:us-east-1:<account_id>:repository/ghcr.io/*",
+            "arn:aws:ecr:us-east-1:<account_id>:repository/docker.io/*",
+            "arn:aws:ecr:us-east-1:<account_id>:repository/registry.k8s.io/*",
+            "arn:aws:ecr:us-east-1:<account_id>:repository/quay.io/*"
         ]
     }]
 }
