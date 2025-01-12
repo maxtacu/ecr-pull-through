@@ -1,10 +1,7 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ],
-  "automerge": true,
-  "commitMessagePrefix": "#patch: ",
-  "forkProcessing": "enabled",
-  "minimumReleaseAge": "10 days"
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": ["config:base"],
+    "dependencyDashboard": true,
+    "minimumReleaseAge": "60 days",
+    "internalChecksFilter": "strict"
 }

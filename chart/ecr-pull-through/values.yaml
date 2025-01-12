@@ -19,10 +19,10 @@ ecrPullThrough:
 replicaCount: 2
 
 image:
-  repository: ghcr.io/estenrye/ecr-pull-through
+  repository: ghcr.io/maxtacu/ecr-pull-through
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "0.0.26"
+  tag: ""
 
 imagePullSecrets: []
 nameOverride: ""

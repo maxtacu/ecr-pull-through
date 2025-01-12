@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -23,106 +22,13 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 
 var config *Config
 
-func generatePatch(registryList []string, specKey string, containerIndex int, awsAccountId string, awsRegion string, containerImage string, podNamespace string, podGeneratedName string) (bool, map[string]string) {
-	ecrRegistryHostname := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com", awsAccountId, awsRegion)
-	dockerHubPullThroughCacheConfigured := false
-
-	// shortcut to avoid patching images that are already patched.
-	if strings.HasPrefix(containerImage, ecrRegistryHostname) {
-		log.Printf("{ \"appliedPatch\": false, \"podNamespace\": \"%s\", \"podGeneratedName\": \"%s\", \"specKey\": \"%s\", \"index\": %d, \"originalImage\": \"%s\" }",
-			podNamespace, podGeneratedName, specKey, containerIndex, containerImage)
-		return false, nil
-	}
-
-	ecrRegex := regexp.MustCompile(`.+\.dkr\.ecr\..+\.amazonaws\.com/`)
-	if ecrRegex.MatchString(containerImage) {
-		log.Printf("{ \"appliedPatch\": false, \"podNamespace\": \"%s\", \"podGeneratedName\": \"%s\", \"specKey\": \"%s\", \"index\": %d, \"originalImage\": \"%s\" }",
-			podNamespace, podGeneratedName, specKey, containerIndex, containerImage)
-		return false, nil
-	}
-
-	// Loop through the list of configured pull-through cache registries.
-	// If the image contains a registry prefix, patch it with the ECR pull through cache image name.
-	for _, registry := range registryList {
-
-		// Note for later whether the docker.io registry is in the list of configured registries
-		// This value is used to trigger docker.io specific logic if we exit this loop without
-		// patching the image.
-		if registry == "docker.io" {
-			dockerHubPullThroughCacheConfigured = true
-		}
-
-		if strings.HasPrefix(containerImage, registry) {
-			newImage := fmt.Sprintf("%s/%s", ecrRegistryHostname, containerImage)
-
-			// split containerImage to find out if it has two or three parts.
-			// if it has three parts, like docker.io/foo/bar, then it is not a library image.
-			// if it has two parts, like docker.io/bar, then it is a library image and needs library injected into the path.
-			parts := strings.Split(containerImage, "/")
-			if len(parts) == 2 {
-				newImage = fmt.Sprintf("%s/%s/library/%s", ecrRegistryHostname, parts[0], parts[1])
-			}
-
-			log.Printf("{ \"appliedPatch\": true, \"podNamespace\": \"%s\", \"podGeneratedName\": \"%s\", \"specKey\": \"%s\", \"index\": %d, \"originalImage\": \"%s\", \"newImage\": \"%s\" }",
-				podNamespace, podGeneratedName, specKey, containerIndex, containerImage, newImage)
-
-			return true, map[string]string{
-				"op":    "replace",
-				"path":  fmt.Sprintf("/spec/%s/%d/image", specKey, containerIndex),
-				"value": newImage,
-			}
-		}
-	}
-
-	// At this point, the image has not been previously treated by the controller
-	// and does not contain any registry prefixes that have been defined in the configMap.
-	// We also know whether the docker.io registry is in the list of configured registries.
-	// We need to check if the image is a library image or not.
-
-	if dockerHubPullThroughCacheConfigured {
-		parts := strings.Split(containerImage, "/")
-		// This logic handles library images without a registry prefix.
-		if len(parts) == 1 {
-			newImage := fmt.Sprintf("%s/docker.io/library/%s", ecrRegistryHostname, containerImage)
-
-			log.Printf("{ \"appliedPatch\": true, \"podNamespace\": \"%s\", \"podGeneratedName\": \"%s\", \"specKey\": \"%s\", \"index\": %d, \"originalImage\": \"%s\", \"newImage\": \"%s\" }",
-				podNamespace, podGeneratedName, specKey, containerIndex, containerImage, newImage)
-
-			return true, map[string]string{
-				"op":    "replace",
-				"path":  fmt.Sprintf("/spec/%s/%d/image", specKey, containerIndex),
-				"value": newImage,
-			}
-		}
-
-		// this logic handles non-library images without a registry prefix.
-		if len(parts) == 2 {
-			newImage := fmt.Sprintf("%s/docker.io/%s", ecrRegistryHostname, containerImage)
-
-			log.Printf("{ \"appliedPatch\": true, \"podNamespace\": \"%s\", \"podGeneratedName\": \"%s\", \"specKey\": \"%s\", \"index\": %d, \"originalImage\": \"%s\", \"newImage\": \"%s\" }",
-				podNamespace, podGeneratedName, specKey, containerIndex, containerImage, newImage)
-
-			return true, map[string]string{
-				"op":    "replace",
-				"path":  fmt.Sprintf("/spec/%s/%d/image", specKey, containerIndex),
-				"value": newImage,
-			}
-		}
-	}
-
-	// The pod will not be patched if the code reaches this point.
-	log.Printf("{ \"appliedPatch\": false, \"podNamespace\": \"%s\", \"podGeneratedName\": \"%s\", \"specKey\": \"%s\", \"index\": %d, \"originalImage\": \"%s\" }",
-		podNamespace, podGeneratedName, specKey, containerIndex, containerImage)
-	return false, nil
-}
-
 func handleMutate(w http.ResponseWriter, r *http.Request) {
 
 	// read the body / request
 	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil {
-		log.Printf("{ \"state\": \"error\", msg: \"%s\" }", err)
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "%s", err)
 	}
@@ -130,7 +36,7 @@ func handleMutate(w http.ResponseWriter, r *http.Request) {
 	// mutate the request
 	mutated, err := actuallyMutate(body)
 	if err != nil {
-		log.Printf("{ \"state\": \"error\", msg: \"%s\" }", err)
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "%s", err)
 	}
@@ -160,7 +66,7 @@ func actuallyMutate(body []byte) ([]byte, error) {
 		if err := json.Unmarshal(ar.Object.Raw, &pod); err != nil {
 			return nil, fmt.Errorf("unable unmarshal pod json object %v", err)
 		}
-		log.Printf("{ \"podNamespace\": \"%s\", \"podGeneratedName\": \"%s\", \"state\": \"started\", msg: \"\" }", pod.Namespace, pod.ObjectMeta.GenerateName)
+		log.Printf("Received request to mutate pod %s:%s", pod.Namespace, pod.ObjectMeta.GenerateName)
 		// set response options
 		resp.Allowed = true
 		resp.UID = ar.UID
@@ -172,25 +78,113 @@ func actuallyMutate(body []byte) ([]byte, error) {
 		p := []map[string]string{}
 		// Containers
 		for i, container := range pod.Spec.Containers {
-			patchApplied, patch := generatePatch(config.RegistryList(), "containers", i, config.AwsAccountID, config.AwsRegion, container.Image, pod.Namespace, pod.ObjectMeta.GenerateName)
-			if patchApplied {
-				p = append(p, patch)
+			imageReplaced := false
+			for _, reg := range config.RegistryList() {
+				if strings.HasPrefix(container.Image, reg) {
+					newImage := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s", config.AwsAccountID, config.AwsRegion, container.Image)
+					patch := map[string]string{
+						"op":    "replace",
+						"path":  fmt.Sprintf("/spec/containers/%d/image", i),
+						"value": newImage,
+					}
+					p = append(p, patch)
+					imageReplaced = true
+					log.Printf("Created patch for container image %s on pod %s:%s, with %s", container.Image, pod.Namespace, pod.ObjectMeta.GenerateName, newImage)
+					break // Stop checking other registries if a match is found
+				}
+			}
+
+			// Check if image does not contain any slashes (indicating it's a Docker Hub Official image)
+			// https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache-working.html#pull-through-cache-working-pulling
+			// and if "docker.io" is in the registry list, then prepend the AWS ECR path.
+			if !imageReplaced && !strings.Contains(container.Image, "/") {
+				for _, reg := range config.RegistryList() {
+					if reg == "docker.io" {
+						newImage := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/docker.io/library/%s", config.AwsAccountID, config.AwsRegion, container.Image)
+						patch := map[string]string{
+							"op":    "replace",
+							"path":  fmt.Sprintf("/spec/containers/%d/image", i),
+							"value": newImage,
+						}
+						p = append(p, patch)
+						log.Printf("Created patch for container image %s on pod %s:%s, with %s", container.Image, pod.Namespace, pod.ObjectMeta.GenerateName, newImage)
+						break
+					}
+				}
 			}
 		}
-
 		// InitContainers
 		for i, initcontainer := range pod.Spec.InitContainers {
-			patchApplied, patch := generatePatch(config.RegistryList(), "initContainers", i, config.AwsAccountID, config.AwsRegion, initcontainer.Image, pod.Namespace, pod.ObjectMeta.GenerateName)
-			if patchApplied {
-				p = append(p, patch)
+			imageReplaced := false
+			for _, reg := range config.RegistryList() {
+				if strings.HasPrefix(initcontainer.Image, reg) {
+					newImage := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s", config.AwsAccountID, config.AwsRegion, initcontainer.Image)
+					patch := map[string]string{
+						"op":    "replace",
+						"path":  fmt.Sprintf("/spec/initContainers/%d/image", i),
+						"value": newImage,
+					}
+					p = append(p, patch)
+					imageReplaced = true
+					log.Printf("Created patch for initcontainer image %s on pod %s:%s, with %s", initcontainer.Image, pod.Namespace, pod.ObjectMeta.GenerateName, newImage)
+					break // Stop checking other registries if a match is found
+				}
+			}
+
+			// Check if image does not contain any slashes (indicating it's a Docker Hub Official image)
+			// https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache-working.html#pull-through-cache-working-pulling
+			// and if "docker.io" is in the registry list, then prepend the AWS ECR path.
+			if !imageReplaced && !strings.Contains(initcontainer.Image, "/") {
+				for _, reg := range config.RegistryList() {
+					if reg == "docker.io" {
+						newImage := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/docker.io/library/%s", config.AwsAccountID, config.AwsRegion, initcontainer.Image)
+						patch := map[string]string{
+							"op":    "replace",
+							"path":  fmt.Sprintf("/spec/initContainers/%d/image", i),
+							"value": newImage,
+						}
+						p = append(p, patch)
+						log.Printf("Created patch for initcontainer image %s on pod %s:%s, with %s", initcontainer.Image, pod.Namespace, pod.ObjectMeta.GenerateName, newImage)
+						break
+					}
+				}
 			}
 		}
-
 		// EphemeralContainers
 		for i, ephemeralcontainer := range pod.Spec.EphemeralContainers {
-			patchApplied, patch := generatePatch(config.RegistryList(), "ephemeralContainers", i, config.AwsAccountID, config.AwsRegion, ephemeralcontainer.Image, pod.Namespace, pod.ObjectMeta.GenerateName)
-			if patchApplied {
-				p = append(p, patch)
+			imageReplaced := false
+			for _, reg := range config.RegistryList() {
+				if strings.HasPrefix(ephemeralcontainer.Image, reg) {
+					newImage := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s", config.AwsAccountID, config.AwsRegion, ephemeralcontainer.Image)
+					patch := map[string]string{
+						"op":    "replace",
+						"path":  fmt.Sprintf("/spec/ephemeralContainers/%d/image", i),
+						"value": newImage,
+					}
+					p = append(p, patch)
+					imageReplaced = true
+					log.Printf("Created patch for ephemeralcontainer image %s on pod %s:%s, with %s", ephemeralcontainer.Image, pod.Namespace, pod.ObjectMeta.GenerateName, newImage)
+					break // Stop checking other registries if a match is found
+				}
+			}
+
+			// Check if image does not contain any slashes (indicating it's a Docker Hub library image)
+			// https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache-working.html#pull-through-cache-working-pulling
+			// and if "docker.io" is in the registry list, then prepend the AWS ECR path.
+			if !imageReplaced && !strings.Contains(ephemeralcontainer.Image, "/") {
+				for _, reg := range config.RegistryList() {
+					if reg == "docker.io" {
+						newImage := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/docker.io/library/%s", config.AwsAccountID, config.AwsRegion, ephemeralcontainer.Image)
+						patch := map[string]string{
+							"op":    "replace",
+							"path":  fmt.Sprintf("/spec/ephemeralContainers/%d/image", i),
+							"value": newImage,
+						}
+						p = append(p, patch)
+						log.Printf("Created patch for ephemeralcontainer image %s on pod %s:%s, with %s", ephemeralcontainer.Image, pod.Namespace, pod.ObjectMeta.GenerateName, newImage)
+						break
+					}
+				}
 			}
 		}
 
@@ -210,7 +204,7 @@ func actuallyMutate(body []byte) ([]byte, error) {
 		if err != nil {
 			return nil, err // untested section
 		}
-		log.Printf("{ \"podNamespace\": \"%s\", \"podGeneratedName\": \"%s\", \"state\": \"successful\" }", pod.Namespace, pod.ObjectMeta.GenerateName)
+		log.Printf("Successfully mutated pod %s:%s", pod.Namespace, pod.ObjectMeta.GenerateName)
 	}
 
 	return responseBody, nil
