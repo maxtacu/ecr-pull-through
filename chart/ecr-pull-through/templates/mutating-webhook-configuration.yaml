@@ -18,7 +18,9 @@ webhooks:
         resources: ["pods"]
         operations: ["CREATE", "UPDATE"]
         scope: Namespaced
+{{- if not .Values.disableWebhookNamespaceSelector}}
     namespaceSelector: 
       {{- .Values.webhookNamspaceSelector | toYaml | nindent 6 }}
+{{- end}}
     sideEffects: None
     admissionReviewVersions: ["v1"]
