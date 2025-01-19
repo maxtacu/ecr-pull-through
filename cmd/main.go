@@ -46,6 +46,17 @@ func handleMutate(w http.ResponseWriter, r *http.Request) {
 	w.Write(mutated)
 }
 
+// Helper function to process Docker Hub official images
+func isDockerHubOfficialImage(image string) bool {
+	// Handle both "nginx" and "docker.io/nginx" format
+	if !strings.Contains(image, "/") {
+		return true
+	}
+	// Handle "docker.io/library/nginx" or "docker.io/nginx" format
+	parts := strings.Split(image, "/")
+	return len(parts) <= 3 && parts[0] == "docker.io" && (len(parts) == 2 || parts[1] == "library")
+}
+
 func actuallyMutate(body []byte) ([]byte, error) {
 	// unmarshal request into AdmissionReview struct
 	admReview := v1beta1.AdmissionReview{}
@@ -94,10 +105,8 @@ func actuallyMutate(body []byte) ([]byte, error) {
 				}
 			}
 
-			// Check if image does not contain any slashes (indicating it's a Docker Hub Official image)
-			// https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache-working.html#pull-through-cache-working-pulling
-			// and if "docker.io" is in the registry list, then prepend the AWS ECR path.
-			if !imageReplaced && !strings.Contains(container.Image, "/") {
+			// Check if image is a Docker Hub official image
+			if !imageReplaced && isDockerHubOfficialImage(container.Image) {
 				for _, reg := range config.RegistryList() {
 					if reg == "docker.io" {
 						newImage := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/docker.io/library/%s", config.AwsAccountID, config.AwsRegion, container.Image)
@@ -131,10 +140,8 @@ func actuallyMutate(body []byte) ([]byte, error) {
 				}
 			}
 
-			// Check if image does not contain any slashes (indicating it's a Docker Hub Official image)
-			// https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache-working.html#pull-through-cache-working-pulling
-			// and if "docker.io" is in the registry list, then prepend the AWS ECR path.
-			if !imageReplaced && !strings.Contains(initcontainer.Image, "/") {
+			// Check if image is a Docker Hub official image
+			if !imageReplaced && isDockerHubOfficialImage(initcontainer.Image) {
 				for _, reg := range config.RegistryList() {
 					if reg == "docker.io" {
 						newImage := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/docker.io/library/%s", config.AwsAccountID, config.AwsRegion, initcontainer.Image)
@@ -168,10 +175,8 @@ func actuallyMutate(body []byte) ([]byte, error) {
 				}
 			}
 
-			// Check if image does not contain any slashes (indicating it's a Docker Hub library image)
-			// https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache-working.html#pull-through-cache-working-pulling
-			// and if "docker.io" is in the registry list, then prepend the AWS ECR path.
-			if !imageReplaced && !strings.Contains(ephemeralcontainer.Image, "/") {
+			// Check if image is a Docker Hub official image
+			if !imageReplaced && isDockerHubOfficialImage(ephemeralcontainer.Image) {
 				for _, reg := range config.RegistryList() {
 					if reg == "docker.io" {
 						newImage := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/docker.io/library/%s", config.AwsAccountID, config.AwsRegion, ephemeralcontainer.Image)
