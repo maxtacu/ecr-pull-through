@@ -1,0 +1,167 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: use-pull-through-dockerio
+  annotations:
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/title: Use ECR Pull Through Cache
+    policies.kyverno.io/minversion: 1.6.0
+    policies.kyverno.io/description: >-
+      Use a ECR Pull Through Cache instead of upstream docker.io community registry.
+spec:
+  rules:
+    - name: rewrite-containers
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      preconditions:
+        all:
+          - key: "{{request.operation || 'BACKGROUND'}}"
+            operator: AnyIn
+            value:
+              - CREATE
+              - UPDATE
+          - key: "{{ images.containers.*.registry[] || `[]` }}"
+            operator: AnyIn
+            value:
+              - docker.io
+      mutate:
+        foreach:
+          - list: request.object.spec.containers
+            preconditions:
+              all:
+                - key: '{{ images.containers."{{element.name}}".registry }}'
+                  operator: AnyIn
+                  value:
+                    - docker.io
+                - key: '{{ images.containers."{{element.name}}".path }}'
+                  operator: NotIn
+                  value: ["*/*"]
+            patchStrategicMerge:
+              spec:
+                containers:
+                  - name: "{{ element.name }}"
+                    image: '<account_id>.dkr.ecr.<account_region>.amazonaws.com/docker.io/library/{{ images.containers."{{element.name}}".path }}:{{ images.containers."{{element.name}}".tag || "latest" }}'
+          - list: request.object.spec.containers
+            preconditions:
+              all:
+                - key: '{{ images.containers."{{element.name}}".registry }}'
+                  operator: AnyIn
+                  value:
+                    - docker.io
+                - key: '{{ images.containers."{{element.name}}".path }}'
+                  operator: AnyIn
+                  value: ["*/*"]
+            patchStrategicMerge:
+              spec:
+                containers:
+                  - name: "{{ element.name }}"
+                    image: '<account_id>.dkr.ecr.<account_region>.amazonaws.com/docker.io/{{ images.containers."{{element.name}}".path }}:{{ images.containers."{{element.name}}".tag || "latest" }}'
+
+    - name: rewrite-initcontainers
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      preconditions:
+        all:
+          - key: "{{request.operation || 'BACKGROUND'}}"
+            operator: AnyIn
+            value:
+              - CREATE
+              - UPDATE
+          - key: "{{ request.object.spec.initContainers[] || '' | length(@) }}"
+            operator: GreaterThanOrEquals
+            value: 1
+          - key: "{{ images.initContainers.*.registry[] || `[]` }}"
+            operator: AnyIn
+            value:
+              - docker.io
+      mutate:
+        foreach:
+          - list: request.object.spec.initContainers
+            preconditions:
+              all:
+                - key: '{{ images.initContainers."{{element.name}}".registry }}'
+                  operator: AnyIn
+                  value:
+                    - docker.io
+                - key: '{{ images.initContainers."{{element.name}}".path }}'
+                  operator: NotIn
+                  value: ["*/*"]
+            patchStrategicMerge:
+              spec:
+                initContainers:
+                  - name: "{{ element.name }}"
+                    image: '<account_id>.dkr.ecr.<account_region>.amazonaws.com/docker.io/library/{{ images.initContainers."{{element.name}}".path }}:{{ images.initContainers."{{element.name}}".tag || "latest" }}'
+          - list: request.object.spec.initContainers
+            preconditions:
+              all:
+                - key: '{{ images.initContainers."{{element.name}}".registry }}'
+                  operator: AnyIn
+                  value:
+                    - docker.io
+                - key: '{{ images.initContainers."{{element.name}}".path }}'
+                  operator: AnyIn
+                  value: ["*/*"]
+            patchStrategicMerge:
+              spec:
+                initContainers:
+                  - name: "{{ element.name }}"
+                    image: '<account_id>.dkr.ecr.<account_region>.amazonaws.com/docker.io/{{ images.initContainers."{{element.name}}".path }}:{{ images.initContainers."{{element.name}}".tag || "latest" }}'
+
+    - name: rewrite-ephemeralcontainers
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      preconditions:
+        all:
+          - key: "{{request.operation || 'BACKGROUND'}}"
+            operator: AnyIn
+            value:
+              - CREATE
+              - UPDATE
+          - key: "{{ request.object.spec.ephemeralContainers[] || '' | length(@) }}"
+            operator: GreaterThanOrEquals
+            value: 1
+          - key: "{{ images.ephemeralContainers.*.registry[] || `[]` }}"
+            operator: AnyIn
+            value:
+              - docker.io
+      mutate:
+        foreach:
+          - list: request.object.spec.ephemeralContainers
+            preconditions:
+              all:
+                - key: '{{ images.ephemeralContainers."{{element.name}}".registry }}'
+                  operator: AnyIn
+                  value:
+                    - docker.io
+                - key: '{{ images.ephemeralContainers."{{element.name}}".path }}'
+                  operator: NotIn
+                  value: ["*/*"]
+            patchStrategicMerge:
+              spec:
+                ephemeralContainers:
+                  - name: "{{ element.name }}"
+                    image: '<account_id>.dkr.ecr.<account_region>.amazonaws.com/docker.io/library/{{ images.ephemeralContainers."{{element.name}}".path }}:{{ images.ephemeralContainers."{{element.name}}".tag || "latest" }}'
+          - list: request.object.spec.ephemeralContainers
+            preconditions:
+              all:
+                - key: '{{ images.ephemeralContainers."{{element.name}}".registry }}'
+                  operator: AnyIn
+                  value:
+                    - docker.io
+                - key: '{{ images.ephemeralContainers."{{element.name}}".path }}'
+                  operator: AnyIn
+                  value: ["*/*"]
+            patchStrategicMerge:
+              spec:
+                ephemeralContainers:
+                  - name: "{{ element.name }}"
+                    image: '<account_id>.dkr.ecr.<account_region>.amazonaws.com/docker.io/{{ images.ephemeralContainers."{{element.name}}".path }}:{{ images.ephemeralContainers."{{element.name}}".tag || "latest" }}'
