@@ -209,7 +209,7 @@ func actuallyMutate(body []byte) ([]byte, error) {
 		if err != nil {
 			return nil, err // untested section
 		}
-		log.Printf("Successfully mutated pod %s:%s", pod.Namespace, pod.ObjectMeta.GenerateName)
+		log.Printf("Successfully mutated pod %s:%s", pod.Namespace, pod.ObjectMeta.Name)
 	}
 
 	return responseBody, nil
@@ -217,7 +217,7 @@ func actuallyMutate(body []byte) ([]byte, error) {
 
 func main() {
 	var err error
-	config, err = ReadConf("/conf/registries.yaml")
+	config, err = ReadConf("/etc/ecr-pull-through/registries.yaml")
 	if err != nil {
 		log.Fatalf("Failed to read config: %v", err)
 	}
@@ -236,14 +236,14 @@ func main() {
 	}
 
 	// Check for TLS certificate and key files
-	_, certErr := os.Stat("/tls/tls.crt")
-	_, keyErr := os.Stat("/tls/tls.key")
+	_, certErr := os.Stat("/etc/webhook/certs/tls.crt")
+	_, keyErr := os.Stat("/etc/webhook/certs/tls.key")
 
 	if os.IsNotExist(certErr) || os.IsNotExist(keyErr) {
 		log.Println("Starting server without TLS...")
 		log.Fatal(s.ListenAndServe())
 	} else {
 		log.Println("Starting server with TLS...")
-		log.Fatal(s.ListenAndServeTLS("/tls/tls.crt", "/tls/tls.key"))
+		log.Fatal(s.ListenAndServeTLS("/etc/webhook/certs/tls.crt", "/etc/webhook/certs/tls.key"))
 	}
 }

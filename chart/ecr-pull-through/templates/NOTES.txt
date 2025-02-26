@@ -1,0 +1,30 @@
+Thank you for installing {{ .Chart.Name }}.
+
+Your release is named {{ .Release.Name }} and has been deployed to namespace {{ .Release.Namespace }}.
+
+The ECR Pull-Through webhook is now configured to:
+1. Listen on port {{ .Values.service.port }}
+2. Use AWS Region: {{ .Values.awsRegion }}
+3. Use AWS Account ID: {{ .Values.awsAccountId }}
+4. Handle images from the following registries:
+{{- range .Values.registries }}
+   - {{ . }}
+{{- end }}
+
+To verify the webhook is working:
+1. Check the webhook configuration:
+   kubectl get mutatingwebhookconfigurations {{ include "ecr-pull-through.fullname" . }}
+
+2. Verify the webhook pod is running:
+   kubectl get pods -n {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "ecr-pull-through.name" . }}"
+
+3. Check webhook logs:
+   kubectl logs -n {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "ecr-pull-through.name" . }}"
+
+4. To test the webhook, create a pod in a namespace labeled with pull-through-enabled=true:
+   kubectl label namespace your-namespace pull-through-enabled=true
+
+Note: The webhook will only process pods in namespaces labeled with pull-through-enabled=true
+
+For more information or to report issues:
+https://github.com/maxtacu/ecr-pull-through
