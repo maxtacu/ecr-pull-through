@@ -12,7 +12,7 @@ This webhook intercepts pod creation requests in your Kubernetes cluster and aut
 
 ## 🚦 Prerequisites
 
-1. **ECR Pull-Through Cache Configuration**
+1. **ECR Pull-Through Cache Configuration**  
    You must manually configure pull-through cache for these registries:
    - `ghcr.io`
    - `docker.io`
@@ -24,7 +24,7 @@ This webhook intercepts pod creation requests in your Kubernetes cluster and aut
    Example configuration:
    ![ECR Pull-Through Configuration](image.png)
 
-2. **IAM Configuration**
+2. **IAM Configuration**  
    Check the `aws-policies` folder for:
    - Example lifecycle policies for Creation Templates
    - ECR Registry policy examples
@@ -34,20 +34,36 @@ This webhook intercepts pod creation requests in your Kubernetes cluster and aut
 
 ## 🛠️ Installation Options
 
-### Option 1: Kyverno Policies
+### Option 1: Helm Chart (Recommended)
+
+1. Clone the repository:
+
+2. Install the chart:
+```bash
+helm install ecr-pull-through -n kube-system chart/ecr-pull-through \
+  --set awsAccount=123456789012 \
+  --set awsRegion=us-west-2
+```
+
+> 📝 **Prerequisites**: 
+> - cert-manager must be installed in your cluster
+> - The chart uses cert-manager to generate TLS certificates for the webhook
+
+### Option 2: Kyverno Policies
 
 > Note: docker.io support is limited in Kyverno configuration
 
-1. Find policies for `quay.io`, `registry.k8s.io`, and `ghcr.io` in the `kyverno` folder
+1. Find policies for `docker.io`, `quay.io`, `registry.k8s.io`, and `ghcr.io` in the `kyverno` folder
 2. Update AWS account ID in policies
 3. Apply to your cluster
 
-### Option 2: Mutation Webhook
+### Option 3: Manual Webhook Installation
 
 1. Clone this repository
-2. Configure [manifests/configmap.yaml](manifests/configmap.yaml)
-3. Ensure your kubectl context points to the target cluster
-4. Run `./install.sh`
+2. Go to `manifests` folder 
+3. Configure [manifests/configmap.yaml](manifests/configmap.yaml)
+4. Ensure your kubectl context points to the target cluster
+5. Run `./install.sh`
 
 > 🔑 **Note**: By default, the webhook only processes namespaces labeled with `pull-through-enabled: "true"`. Modify [manifests/bundle.yaml](manifests/bundle.yaml) to change this behavior.
 
@@ -58,14 +74,11 @@ Use the sample pod manifests in the `tests` folder to verify the webhook's opera
 ## 🧹 Maintenance
 
 ### ECR Repository Cleanup
+This might be useful if you are testing ECR Pull-through and want to occasionally cleanup pull-through registries.   
 Use [ecr-cleanup.sh](ecr-cleanup.sh) to remove pull-through generated repositories:
 ```bash
 ./ecr-cleanup.sh
 ```
-
-## 📝 Contributing
-
-Contributions are welcome! Especially for improving Kyverno support for `docker.io`.
 
 ## 📄 License
 
