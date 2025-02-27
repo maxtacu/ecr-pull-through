@@ -30,14 +30,14 @@ echo
 echo ">> MutatingWebhookConfiguration caBundle: $CA"
 
 if [[ "$(uname)" == "Darwin" ]]; then
-    sed -i '' "s/REPLACEME/$CA/" manifests/bundle.yaml
+    sed -i '' "s/REPLACEME/$CA/" bundle.yaml > bundle_modified.yaml
 else
-    sed -i "s/REPLACEME/$CA/" manifests/bundle.yaml
+    sed -i "s/REPLACEME/$CA/" bundle.yaml > bundle_modified.yaml
 fi
 
-kubectl apply -f manifests/
+kubectl apply -f .
 
-rm ca.crt ca.key ca.srl server.crt server.csr server.key bundle.yaml
+rm ca.crt ca.key ca.srl server.crt server.csr server.key bundle_modified.yaml
 
 echo
 echo "Pull Through mutation webhook is now installed."
