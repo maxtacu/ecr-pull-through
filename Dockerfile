@@ -10,4 +10,4 @@ FROM gcr.io/distroless/base-debian10
 
 COPY --from=0 /app/bin/mutation-webhook /
 
-ENTRYPOINT [ "/mutation-webhook" ]%
+ENTRYPOINT [ "/mutation-webhook" ]
